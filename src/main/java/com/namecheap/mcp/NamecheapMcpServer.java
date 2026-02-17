@@ -17,7 +17,14 @@ public class NamecheapMcpServer {
     public static void main(String[] args) {
         try {
             if (args.length > 0 && "--init".equals(args[0])) {
-                NamecheapAuth.init();
+                String claudeBinary = null;
+                for (int i = 1; i < args.length - 1; i++) {
+                    if ("--claude-binary".equals(args[i])) {
+                        claudeBinary = args[i + 1];
+                        break;
+                    }
+                }
+                NamecheapAuth.init(claudeBinary);
                 return;
             }
 

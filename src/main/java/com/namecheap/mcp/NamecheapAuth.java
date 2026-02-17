@@ -15,6 +15,7 @@ final class NamecheapAuth {
     private static final Logger log = LoggerFactory.getLogger(NamecheapAuth.class);
     private static final Path CONFIG_DIR;
     private static final Path CONFIG_FILE;
+    private static final String MCP_SERVER_NAME = "namecheap";
 
     static {
         String home = System.getProperty("user.home");
@@ -57,14 +58,31 @@ final class NamecheapAuth {
         return new Config(apiUser, apiKey, userName, clientIp, useSandbox);
     }
 
-    static void init() throws IOException {
+    static void init(String claudeBinary) throws IOException, InterruptedException {
         Console console = System.console();
         if (console == null) {
             throw new IllegalStateException("No console available. Run --init from an interactive terminal.");
         }
 
-        System.err.println("Namecheap MCP Server — Initial Setup");
-        System.err.println("=====================================");
+        System.err.println("Namecheap MCP Server — Setup");
+        System.err.println("============================");
+        System.err.println();
+
+        boolean configExists = Files.exists(CONFIG_FILE);
+        if (configExists) {
+            System.err.println("[skip] Config already exists at " + CONFIG_FILE);
+        } else {
+            setupConfig(console);
+        }
+
+        System.err.println();
+        registerWithClaude(console, claudeBinary);
+
+        System.err.println();
+        System.err.println("Done. Restart Claude Code to use the namecheap tools.");
+    }
+
+    private static void setupConfig(Console console) throws IOException {
         System.err.println("You'll need your Namecheap API credentials.");
         System.err.println("Enable API access at: https://ap.www.namecheap.com/settings/tools/apiaccess/");
         System.err.println();
@@ -93,10 +111,96 @@ final class NamecheapAuth {
         }
 
         Files.setPosixFilePermissions(CONFIG_FILE, PosixFilePermissions.fromString("rw-------"));
+        System.err.println("[done] Config saved to " + CONFIG_FILE);
+    }
 
-        System.err.println();
-        System.err.println("Config saved to " + CONFIG_FILE);
-        System.err.println("You can now start the MCP server.");
+    private static void registerWithClaude(Console console, String claudeBinary)
+            throws IOException, InterruptedException {
+        if (claudeBinary == null || claudeBinary.isBlank()) {
+            claudeBinary = findClaudeBinary();
+        }
+
+        if (claudeBinary == null) {
+            System.err.println("[skip] Claude Code binary not found. Register manually:");
+            printManualRegistration();
+            return;
+        }
+
+        if (isAlreadyRegistered(claudeBinary)) {
+            System.err.println("[skip] Already registered with Claude Code");
+            return;
+        }
+
+        String jarPath = resolveJarPath();
+        System.err.println("Registering with Claude Code...");
+
+        var process = new ProcessBuilder(
+                claudeBinary, "mcp", "add",
+                "--scope", "user",
+                "--transport", "stdio",
+                MCP_SERVER_NAME, "--",
+                "java", "-jar", jarPath)
+                .inheritIO()
+                .start();
+
+        int exitCode = process.waitFor();
+        if (exitCode == 0) {
+            System.err.println("[done] Registered as '" + MCP_SERVER_NAME + "'");
+        } else {
+            System.err.println("[fail] Registration failed (exit " + exitCode + "). Register manually:");
+            printManualRegistration();
+        }
+    }
+
+    private static String findClaudeBinary() {
+        String[] candidates = {
+                "claude",
+                System.getProperty("user.home") + "/.local/bin/claude",
+                "/usr/local/bin/claude",
+                "/usr/bin/claude"
+        };
+
+        for (String candidate : candidates) {
+            try {
+                var process = new ProcessBuilder(candidate, "--version")
+                        .redirectErrorStream(true)
+                        .start();
+                int exit = process.waitFor();
+                if (exit == 0) {
+                    return candidate;
+                }
+            } catch (Exception ignored) {
+            }
+        }
+        return null;
+    }
+
+    private static boolean isAlreadyRegistered(String claudeBinary) {
+        try {
+            var process = new ProcessBuilder(claudeBinary, "mcp", "list")
+                    .redirectErrorStream(true)
+                    .start();
+            String output = new String(process.getInputStream().readAllBytes());
+            process.waitFor();
+            return output.contains(MCP_SERVER_NAME + ":");
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    private static String resolveJarPath() {
+        String jarPath = NamecheapAuth.class.getProtectionDomain()
+                .getCodeSource().getLocation().getPath();
+        if (jarPath.endsWith(".jar")) {
+            return Path.of(jarPath).toAbsolutePath().toString();
+        }
+        return Path.of("target", "namecheap-mcp-1.0.0.jar").toAbsolutePath().toString();
+    }
+
+    private static void printManualRegistration() {
+        String jarPath = resolveJarPath();
+        System.err.println("  claude mcp add --scope user --transport stdio namecheap -- \\");
+        System.err.println("    java -jar " + jarPath);
     }
 
     private static void ensureConfigDir() throws IOException {
