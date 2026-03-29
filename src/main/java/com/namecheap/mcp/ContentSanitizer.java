@@ -6,7 +6,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-final class ContentSanitizer {
+public final class ContentSanitizer {
 
     private static final SecureRandom RANDOM = new SecureRandom();
     private static final String BOUNDARY_PREFIX = "----UNTRUSTED_CONTENT_";

@@ -24,7 +24,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.regex.Pattern;
 
-final class NamecheapClient {
+public final class NamecheapClient {
 
     private static final Logger log = LoggerFactory.getLogger(NamecheapClient.class);
 
@@ -44,6 +44,10 @@ final class NamecheapClient {
     private final RateLimiter rateLimiter;
     private final HttpClient httpClient;
     private final DocumentBuilderFactory dbFactory;
+
+    public NamecheapClient(String apiUser, String apiKey, String clientIp, RateLimiter rateLimiter) {
+        this(new NamecheapAuth.Config(apiUser, apiKey, apiUser, clientIp, false), rateLimiter);
+    }
 
     NamecheapClient(NamecheapAuth.Config config, RateLimiter rateLimiter) {
         this.config = config;
@@ -70,7 +74,7 @@ final class NamecheapClient {
 
     // --- public API methods ---
 
-    List<Map<String, Object>> listDomains(int page, int pageSize) {
+    public List<Map<String, Object>> listDomains(int page, int pageSize) {
         var params = Map.of(
                 "PageSize", String.valueOf(Math.min(Math.max(pageSize, 1), 100)),
                 "Page", String.valueOf(Math.max(page, 1)));
@@ -101,7 +105,7 @@ final class NamecheapClient {
         return result;
     }
 
-    Map<String, Object> getDomainInfo(String sld, String tld) {
+    public Map<String, Object> getDomainInfo(String sld, String tld) {
         validateDomainParts(sld, tld);
         var params = Map.of("DomainName", sld + "." + tld);
         Document doc = execute("namecheap.domains.getInfo", params);
@@ -138,7 +142,7 @@ final class NamecheapClient {
         return result;
     }
 
-    List<Map<String, Object>> getDnsHosts(String sld, String tld) {
+    public List<Map<String, Object>> getDnsHosts(String sld, String tld) {
         validateDomainParts(sld, tld);
         var params = Map.of("SLD", sld, "TLD", tld);
         Document doc = execute("namecheap.domains.dns.getHosts", params);
@@ -161,7 +165,7 @@ final class NamecheapClient {
         return result;
     }
 
-    Map<String, Object> getNameservers(String sld, String tld) {
+    public Map<String, Object> getNameservers(String sld, String tld) {
         validateDomainParts(sld, tld);
         var params = Map.of("SLD", sld, "TLD", tld);
         Document doc = execute("namecheap.domains.dns.getList", params);
@@ -184,7 +188,7 @@ final class NamecheapClient {
         return result;
     }
 
-    Map<String, Object> setDnsHosts(String sld, String tld, List<Map<String, String>> records) {
+    public Map<String, Object> setDnsHosts(String sld, String tld, List<Map<String, String>> records) {
         validateDomainParts(sld, tld);
         var params = new LinkedHashMap<String, String>();
         params.put("SLD", sld);
@@ -244,7 +248,7 @@ final class NamecheapClient {
         return response;
     }
 
-    Map<String, Object> setNameservers(String sld, String tld, List<String> nameservers) {
+    public Map<String, Object> setNameservers(String sld, String tld, List<String> nameservers) {
         validateDomainParts(sld, tld);
         var params = new LinkedHashMap<String, String>();
         params.put("SLD", sld);
@@ -268,6 +272,59 @@ final class NamecheapClient {
         response.put("domain", sld + "." + tld);
         response.put("nameservers", nameservers);
         return response;
+    }
+
+    // --- Domain-based convenience methods (take full domain, split internally) ---
+
+    private static final Set<String> MULTI_PART_TLDS = Set.of(
+            "co.uk", "org.uk", "me.uk", "net.uk", "ac.uk",
+            "co.nz", "co.za", "com.au", "net.au", "org.au",
+            "co.in", "com.br", "co.jp");
+
+    public static String[] splitDomain(String domain) {
+        String d = domain.toLowerCase().trim();
+        String[] parts = d.split("\\.");
+        if (parts.length < 2) throw new IllegalArgumentException("Invalid domain: " + domain);
+        if (parts.length >= 3) {
+            String possibleTld = parts[parts.length - 2] + "." + parts[parts.length - 1];
+            if (MULTI_PART_TLDS.contains(possibleTld)) {
+                String sld = String.join(".", java.util.Arrays.copyOf(parts, parts.length - 2));
+                return new String[]{sld, possibleTld};
+            }
+        }
+        String sld = String.join(".", java.util.Arrays.copyOf(parts, parts.length - 1));
+        return new String[]{sld, parts[parts.length - 1]};
+    }
+
+    public List<Map<String, Object>> listAllDomains() {
+        var allDomains = new ArrayList<Map<String, Object>>();
+        int page = 1;
+        while (true) {
+            var domains = listDomains(page, 100);
+            // Remove paging metadata if present
+            var filtered = domains.stream()
+                    .filter(d -> !d.containsKey("_paging"))
+                    .toList();
+            allDomains.addAll(filtered);
+            if (filtered.size() < 100) break;
+            page++;
+        }
+        return allDomains;
+    }
+
+    public List<Map<String, Object>> getDnsHostsByDomain(String domain) {
+        String[] parts = splitDomain(domain);
+        return getDnsHosts(parts[0], parts[1]);
+    }
+
+    public Map<String, Object> getNameserversByDomain(String domain) {
+        String[] parts = splitDomain(domain);
+        return getNameservers(parts[0], parts[1]);
+    }
+
+    public Map<String, Object> setNameserversByDomain(String domain, List<String> nameservers) {
+        String[] parts = splitDomain(domain);
+        return setNameservers(parts[0], parts[1], nameservers);
     }
 
     // --- internal helpers ---
@@ -376,7 +433,7 @@ final class NamecheapClient {
         return list.getLength() > 0 ? list.item(0).getTextContent().trim() : "";
     }
 
-    static final class NamecheapApiException extends RuntimeException {
+    public static final class NamecheapApiException extends RuntimeException {
         NamecheapApiException(String message) {
             super(message);
         }
