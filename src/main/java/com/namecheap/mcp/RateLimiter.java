@@ -4,7 +4,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.concurrent.ConcurrentLinkedDeque;
 
-final class RateLimiter {
+public final class RateLimiter {
 
     private final int maxPerMinute;
     private final int maxPerHour;
@@ -67,7 +67,7 @@ final class RateLimiter {
         return timestamps.size();
     }
 
-    static final class RateLimitExceededException extends RuntimeException {
+    public static final class RateLimitExceededException extends RuntimeException {
         RateLimitExceededException(String message) {
             super(message);
         }

@@ -20,7 +20,7 @@
             <dependency>
                 <groupId>io.modelcontextprotocol.sdk</groupId>
                 <artifactId>mcp-bom</artifactId>
-                <version>0.17.2</version>
+                <version>1.1.1</version>
                 <type>pom</type>
                 <scope>import</scope>
             </dependency>
@@ -30,7 +30,11 @@
     <dependencies>
         <dependency>
             <groupId>io.modelcontextprotocol.sdk</groupId>
-            <artifactId>mcp</artifactId>
+            <artifactId>mcp-core</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.modelcontextprotocol.sdk</groupId>
+            <artifactId>mcp-json-jackson2</artifactId>
         </dependency>
         <dependency>
             <groupId>ch.qos.logback</groupId>

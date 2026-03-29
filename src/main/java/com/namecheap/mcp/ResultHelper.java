@@ -7,7 +7,7 @@ import io.modelcontextprotocol.spec.McpSchema.CallToolResult;
 import java.util.List;
 import java.util.Map;
 
-final class ResultHelper {
+public final class ResultHelper {
 
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
@@ -19,9 +19,12 @@ final class ResultHelper {
             var sanitized = ContentSanitizer.sanitizeRecords(data, boundary);
             String json = OBJECT_MAPPER.writerWithDefaultPrettyPrinter().writeValueAsString(sanitized);
             String securityContext = ContentSanitizer.buildSecurityContext(boundary);
-            return new CallToolResult(List.of(
-                    new McpSchema.TextContent(securityContext),
-                    new McpSchema.TextContent(json)), false);
+            return CallToolResult.builder()
+                    .content(List.of(
+                            new McpSchema.TextContent(securityContext),
+                            new McpSchema.TextContent(json)))
+                    .isError(false)
+                    .build();
         } catch (Exception e) {
             return errorResult("Failed to serialise result: " + e.getMessage());
         }
@@ -30,14 +33,20 @@ final class ResultHelper {
     static CallToolResult jsonResult(Object data) {
         try {
             String json = OBJECT_MAPPER.writerWithDefaultPrettyPrinter().writeValueAsString(data);
-            return new CallToolResult(List.of(new McpSchema.TextContent(json)), false);
+            return CallToolResult.builder()
+                    .addTextContent(json)
+                    .isError(false)
+                    .build();
         } catch (Exception e) {
             return errorResult("Failed to serialise result: " + e.getMessage());
         }
     }
 
     static CallToolResult errorResult(String message) {
-        return new CallToolResult(List.of(new McpSchema.TextContent(message)), true);
+        return CallToolResult.builder()
+                .addTextContent(message)
+                .isError(true)
+                .build();
     }
 
     static String getString(Map<String, Object> args, String key) {

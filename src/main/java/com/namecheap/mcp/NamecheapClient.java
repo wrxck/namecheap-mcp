@@ -24,7 +24,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.regex.Pattern;
 
-final class NamecheapClient {
+public final class NamecheapClient {
 
     private static final Logger log = LoggerFactory.getLogger(NamecheapClient.class);
 
@@ -44,6 +44,10 @@ final class NamecheapClient {
     private final RateLimiter rateLimiter;
     private final HttpClient httpClient;
     private final DocumentBuilderFactory dbFactory;
+
+    public NamecheapClient(String apiUser, String apiKey, String clientIp, RateLimiter rateLimiter) {
+        this(new NamecheapAuth.Config(apiUser, apiKey, apiUser, clientIp, false), rateLimiter);
+    }
 
     NamecheapClient(NamecheapAuth.Config config, RateLimiter rateLimiter) {
         this.config = config;
@@ -376,7 +380,7 @@ final class NamecheapClient {
         return list.getLength() > 0 ? list.item(0).getTextContent().trim() : "";
     }
 
-    static final class NamecheapApiException extends RuntimeException {
+    public static final class NamecheapApiException extends RuntimeException {
         NamecheapApiException(String message) {
             super(message);
         }

@@ -10,7 +10,7 @@ import java.nio.file.Path;
 import java.nio.file.attribute.PosixFilePermissions;
 import java.util.Properties;
 
-final class NamecheapAuth {
+public final class NamecheapAuth {
 
     private static final Logger log = LoggerFactory.getLogger(NamecheapAuth.class);
     private static final Path CONFIG_DIR;
@@ -27,7 +27,7 @@ final class NamecheapAuth {
 
     private NamecheapAuth() {}
 
-    record Config(String apiUser, String apiKey, String userName, String clientIp, boolean useSandbox) {
+    public record Config(String apiUser, String apiKey, String userName, String clientIp, boolean useSandbox) {
         String baseUrl() {
             return useSandbox
                     ? "https://api.sandbox.namecheap.com/xml.response"
