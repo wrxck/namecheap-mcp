@@ -24,15 +24,16 @@ public class NamecheapMcpServer {
             var config = NamecheapAuth.getConfig();
             var rateLimiter = new RateLimiter();
             var client = new NamecheapClient(config, rateLimiter);
+            var apClient = new NamecheapApClient();
 
-            startServer(client);
+            startServer(client, apClient);
         } catch (Exception e) {
             log.error("Failed to start Namecheap MCP server", e);
             System.exit(1);
         }
     }
 
-    private static void startServer(NamecheapClient client) {
+    private static void startServer(NamecheapClient client, NamecheapApClient apClient) {
         var transport = new StdioServerTransportProvider(
                 new JacksonMcpJsonMapper(OBJECT_MAPPER));
 
@@ -49,7 +50,10 @@ public class NamecheapMcpServer {
                         NamecheapTools.setDnsHosts(client),
                         NamecheapTools.addDnsRecord(client),
                         NamecheapTools.removeDnsRecord(client),
-                        NamecheapTools.setNameservers(client))
+                        NamecheapTools.setNameservers(client),
+                        NamecheapTools.getDnsSec(client),
+                        NamecheapTools.addDnsSecRecord(apClient),
+                        NamecheapTools.removeDnsSecRecord(apClient))
                 .build();
 
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {

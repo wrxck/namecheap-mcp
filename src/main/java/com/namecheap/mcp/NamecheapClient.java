@@ -248,6 +248,25 @@ public final class NamecheapClient {
         return response;
     }
 
+    public Map<String, Object> getDnsSec(String sld, String tld, boolean isHosted) {
+        validateDomainParts(sld, tld);
+        var params = new LinkedHashMap<String, String>();
+        params.put("DomainName", sld + "." + tld);
+        params.put("SLD", sld);
+        params.put("TLD", tld);
+        params.put("IsHosted", String.valueOf(isHosted));
+        Document doc = execute("namecheap.domains.dnssec.getList", params);
+        Element result = getFirstElement(doc, "DnsSecGetListResult");
+        var response = new LinkedHashMap<String, Object>();
+        if (result != null) {
+            response.put("domain", result.getAttribute("Domain"));
+            response.put("isSuccess", "true".equalsIgnoreCase(result.getAttribute("IsSuccess")));
+            response.put("supported", "true".equalsIgnoreCase(getElementText(result, "supported")));
+            response.put("enabled", "true".equalsIgnoreCase(getElementText(result, "enabled")));
+        }
+        return response;
+    }
+
     public Map<String, Object> setNameservers(String sld, String tld, List<String> nameservers) {
         validateDomainParts(sld, tld);
         var params = new LinkedHashMap<String, String>();
