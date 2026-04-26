@@ -37,7 +37,7 @@ public class NamecheapMcpServer {
             var config = NamecheapAuth.getConfig();
             var rateLimiter = new RateLimiter();
             var client = new NamecheapClient(config, rateLimiter);
-            List<SyncToolSpecification> tools = tools(client);
+            List<SyncToolSpecification> tools = tools(client, new NamecheapApClient());
 
             if (transport.http()) {
                 startHttpServer(tools, transport);
@@ -51,7 +51,7 @@ public class NamecheapMcpServer {
     }
 
     // one list keeps the stdio and http paths from drifting apart
-    static List<SyncToolSpecification> tools(NamecheapClient client) {
+    static List<SyncToolSpecification> tools(NamecheapClient client, NamecheapApClient apClient) {
         return List.of(
                 NamecheapTools.listDomains(client),
                 NamecheapTools.getDomainInfo(client),
@@ -60,7 +60,10 @@ public class NamecheapMcpServer {
                 NamecheapTools.setDnsHosts(client),
                 NamecheapTools.addDnsRecord(client),
                 NamecheapTools.removeDnsRecord(client),
-                NamecheapTools.setNameservers(client));
+                NamecheapTools.setNameservers(client),
+                NamecheapTools.getDnsSec(client),
+                NamecheapTools.addDnsSecRecord(apClient),
+                NamecheapTools.removeDnsSecRecord(apClient));
     }
 
     private static void startHttpServer(List<SyncToolSpecification> tools, TransportConfig transport)
