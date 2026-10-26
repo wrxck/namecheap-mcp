@@ -66,6 +66,38 @@ claude mcp add --scope user --transport stdio namecheap -- \
 
 Restart Claude Code after registration. The 8 Namecheap tools will be available immediately.
 
+### Command-line options
+
+| Flag | Description | Default |
+|------|-------------|---------|
+| `--init` | Run the credential and Claude Code setup, then exit | |
+| `--claude-binary` | Path to the `claude` binary for `--init` | `claude` on `PATH` |
+| `--transport` | `stdio` (one client) or `http` (one shared server for many clients) | `stdio` |
+| `--bind` | Address for `http` | `127.0.0.1` |
+| `--port` | Port for `http` | `7403` |
+| `--auth-token-file` | File with the bearer token; required for `http` | |
+
+### Shared HTTP server
+
+By default each Claude session starts its own copy of the server. With `--transport http`, one copy serves every session over MCP streamable HTTP at `/mcp`.
+
+```bash
+java -Xmx128m -XX:+UseSerialGC -jar target/namecheap-mcp-1.0.0.jar \
+  --transport http --port 7403 --auth-token-file /run/credentials/mcp-namecheap.service/token
+```
+
+Every request must send `Authorization: Bearer <token>`. The server refuses to start if the token file is readable by every user, or if the token has fewer than 32 characters. Register it in Claude Code with a `headersHelper` that prints the header:
+
+```json
+"namecheap": {
+  "type": "http",
+  "url": "http://127.0.0.1:7403/mcp",
+  "headersHelper": "/usr/local/bin/mcp-auth-header namecheap"
+}
+```
+
+The server still reads its Namecheap credentials from `~/.namecheap-mcp/config.properties` of the user that runs it.
+
 ## Usage examples
 
 Once registered, you can ask Claude:
@@ -87,6 +119,7 @@ DNS data returned by the API passes through an LLM's context window. Domain name
 - **Input validation** — Domain SLD/TLD are validated against strict regexes before URL construction. Record types are restricted to a known enum. IP addresses are validated for A/AAAA records. TTL and MX priority ranges are enforced.
 - **Rate limiting** — Client-side sliding window limits requests to 20/minute and 700/hour, matching Namecheap's API limits.
 - **API key protection** — Config directory uses `rwx------` permissions, config file uses `rw-------`. The API key is never logged.
+- **HTTP auth** — In `http` mode, every request needs the bearer token. The compare is constant-time. Bind to `127.0.0.1` only; containers on the host network can reach loopback, and the token is what keeps them out.
 
 Write-tool responses (`set_dns_hosts`, `add_dns_record`, `remove_dns_record`, `set_nameservers`) use plain JSON without boundaries since they contain only system-controlled success/failure data.
 
@@ -99,7 +132,7 @@ Claude Code  <--stdio (JSON-RPC)-->  namecheap-mcp.jar  <--HTTPS/XML-->  Nameche
                                        config.properties
 ```
 
-- **Transport** — stdio (Claude Code spawns the server as a subprocess)
+- **Transport** — stdio by default (Claude Code spawns the server as a subprocess); optional shared streamable HTTP at `/mcp` with `--transport http`
 - **Auth** — static API key + IP whitelist (no OAuth, no token refresh)
 - **API format** — Namecheap uses XML responses; parsed with a hardened `DocumentBuilderFactory`
 - **Logging** — all logs go to stderr (stdout is reserved for MCP JSON-RPC)
@@ -144,6 +177,8 @@ java -jar target/namecheap-mcp-1.0.0.jar
 ```
 src/main/java/com/namecheap/mcp/
   NamecheapMcpServer.java    # Entry point, server setup
+  TransportConfig.java       # --transport/--bind/--port/--auth-token-file parsing
+  HttpTransportServer.java   # Embedded Jetty, streamable HTTP at /mcp, bearer auth
   NamecheapTools.java        # MCP tool definitions (8 tools)
   NamecheapClient.java       # HTTP client, XML parsing, API calls
   NamecheapAuth.java         # Config loading, --init flow, Claude registration
@@ -156,6 +191,8 @@ src/test/java/com/namecheap/mcp/
   RateLimiterTest.java       # Rate limit enforcement
   NamecheapClientTest.java   # Input validation, domain parsing
   NamecheapMcpServerTest.java # Response pipeline (sanitised vs plain JSON)
+  TransportConfigTest.java   # Flag parsing, token file checks
+  HttpTransportServerTest.java # Bearer auth, /mcp routing
 ```
 
 ## License
