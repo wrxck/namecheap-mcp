@@ -7,6 +7,7 @@ import org.junit.jupiter.api.Test;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -69,5 +70,16 @@ class NamecheapMcpServerTest {
         assertTrue(json.contains("\"type\" : \"A\""));
         assertTrue(json.contains("\"ttl\" : \"1800\""));
         assertTrue(json.contains("\"hostId\" : \"12345\""));
+    }
+
+    @Test
+    void tools_servesTheDnssecToolsOnBothTransports() {
+        var config = new NamecheapAuth.Config("user", "key", "user", "127.0.0.1", true);
+        var tools = NamecheapMcpServer.tools(new NamecheapClient(config, new RateLimiter()), new NamecheapApClient());
+
+        var names = tools.stream().map(t -> t.tool().name()).collect(Collectors.toSet());
+
+        assertEquals(11, tools.size());
+        assertTrue(names.containsAll(List.of("get_dnssec", "add_dnssec_record", "remove_dnssec_record")));
     }
 }

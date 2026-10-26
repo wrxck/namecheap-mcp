@@ -341,6 +341,115 @@ final class NamecheapTools {
                 .build();
     }
 
+    static McpServerFeatures.SyncToolSpecification getDnsSec(NamecheapClient client) {
+        var props = new LinkedHashMap<String, Map<String, Object>>();
+        props.put("sld", Map.of("type", "string", "description", "Second-level domain"));
+        props.put("tld", Map.of("type", "string", "description", "Top-level domain"));
+        props.put("isHosted", Map.of("type", "boolean",
+                "description", "True if domain uses Namecheap nameservers, false if external (e.g. Cloudflare)"));
+        var schema = schema(props, List.of("sld", "tld"));
+
+        var tool = McpSchema.Tool.builder()
+                .name("get_dnssec")
+                .description("Check whether DNSSEC is supported and enabled for a domain. " +
+                        "Uses the namecheap.domains.dnssec.getList endpoint.")
+                .inputSchema(schema)
+                .build();
+
+        return McpServerFeatures.SyncToolSpecification.builder()
+                .tool(tool)
+                .callHandler((exchange, request) -> {
+                    try {
+                        var args = request.arguments();
+                        String sld = getString(args, "sld");
+                        String tld = getString(args, "tld");
+                        boolean isHosted = args.containsKey("isHosted")
+                                && Boolean.parseBoolean(String.valueOf(args.get("isHosted")));
+                        var info = client.getDnsSec(sld, tld, isHosted);
+                        return jsonResult(info);
+                    } catch (Exception e) {
+                        return errorResult(e.getMessage());
+                    }
+                })
+                .build();
+    }
+
+    static McpServerFeatures.SyncToolSpecification addDnsSecRecord(NamecheapApClient apClient) {
+        var props = new LinkedHashMap<String, Map<String, Object>>();
+        props.put("domain", Map.of("type", "string", "description", "Full domain name (e.g. example.com)"));
+        props.put("keyTag", Map.of("type", "integer", "description", "DS key tag (uint16)"));
+        props.put("algorithm", Map.of("type", "integer",
+                "description", "DNSSEC algorithm (e.g. 13 for ECDSAP256SHA256, 8 for RSASHA256)"));
+        props.put("digestType", Map.of("type", "integer", "description", "Digest type (1=SHA1, 2=SHA256, 4=SHA384)"));
+        props.put("digest", Map.of("type", "string", "description", "Digest hex string"));
+        props.put("isHosted", Map.of("type", "boolean",
+                "description", "True if using Namecheap nameservers, false if external (default false)"));
+        var schema = schema(props, List.of("domain", "keyTag", "algorithm", "digestType", "digest"));
+
+        var tool = McpSchema.Tool.builder()
+                .name("add_dnssec_record")
+                .description("Add a DS record to a domain at the registrar. " +
+                        "Uses the Namecheap admin-panel endpoint (not the public API). " +
+                        "Requires AP cookies in ~/.namecheap-mcp/ap-cookies.txt — see file for refresh notes.")
+                .inputSchema(schema)
+                .build();
+
+        return McpServerFeatures.SyncToolSpecification.builder()
+                .tool(tool)
+                .callHandler((exchange, request) -> {
+                    try {
+                        var args = request.arguments();
+                        String domain = getString(args, "domain");
+                        int keyTag = getInt(args, "keyTag", 0);
+                        int algorithm = getInt(args, "algorithm", 0);
+                        int digestType = getInt(args, "digestType", 0);
+                        String digest = getString(args, "digest");
+                        boolean isHosted = args.containsKey("isHosted")
+                                && Boolean.parseBoolean(String.valueOf(args.get("isHosted")));
+                        var result = apClient.addDnsSecRecord(domain, isHosted, keyTag, algorithm, digestType, digest);
+                        return jsonResult(result);
+                    } catch (Exception e) {
+                        return errorResult(e.getMessage());
+                    }
+                })
+                .build();
+    }
+
+    static McpServerFeatures.SyncToolSpecification removeDnsSecRecord(NamecheapApClient apClient) {
+        var props = new LinkedHashMap<String, Map<String, Object>>();
+        props.put("domain", Map.of("type", "string", "description", "Full domain name"));
+        props.put("recordId", Map.of("type", "integer",
+                "description", "ID of the DS record to remove (from the AP UI/API)"));
+        props.put("isHosted", Map.of("type", "boolean",
+                "description", "True if using Namecheap nameservers, false if external (default false)"));
+        var schema = schema(props, List.of("domain", "recordId"));
+
+        var tool = McpSchema.Tool.builder()
+                .name("remove_dnssec_record")
+                .description("Remove a DS record from a domain. " +
+                        "Uses the Namecheap admin-panel endpoint and requires AP cookies. " +
+                        "Endpoint shape inferred — may need adjustment if Namecheap changes their UI.")
+                .inputSchema(schema)
+                .build();
+
+        return McpServerFeatures.SyncToolSpecification.builder()
+                .tool(tool)
+                .callHandler((exchange, request) -> {
+                    try {
+                        var args = request.arguments();
+                        String domain = getString(args, "domain");
+                        int recordId = getInt(args, "recordId", 0);
+                        boolean isHosted = args.containsKey("isHosted")
+                                && Boolean.parseBoolean(String.valueOf(args.get("isHosted")));
+                        var result = apClient.removeDnsSecRecord(domain, isHosted, recordId);
+                        return jsonResult(result);
+                    } catch (Exception e) {
+                        return errorResult(e.getMessage());
+                    }
+                })
+                .build();
+    }
+
     @SuppressWarnings("unchecked")
     private static McpSchema.JsonSchema schema(Map<String, ?> properties, List<String> required) {
         return new McpSchema.JsonSchema("object",

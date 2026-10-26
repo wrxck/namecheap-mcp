@@ -14,10 +14,15 @@ A [Model Context Protocol](https://modelcontextprotocol.io/) (MCP) server for ma
 | `remove_dns_record` | Remove a matching DNS record by name, type, and optionally address |
 | `set_dns_hosts` | Replace **all** DNS records for a domain (use with caution) |
 | `set_nameservers` | Set custom nameservers or revert to Namecheap defaults |
+| `get_dnssec` | Get the DS records registered for a domain |
+| `add_dnssec_record` | Add a DS record at the registrar (needs admin-panel cookies, see below) |
+| `remove_dnssec_record` | Remove a DS record by its ID (needs admin-panel cookies, see below) |
 
 Write tools (`add_dns_record`, `remove_dns_record`, `set_dns_hosts`, `set_nameservers`) always return the previous state in their response so changes can be reverted.
 
 Supported record types: `A`, `AAAA`, `CNAME`, `MX`, `MXE`, `TXT`, `URL`, `URL301`, `FRAME`.
+
+`add_dnssec_record` and `remove_dnssec_record` call Namecheap admin-panel endpoints, because the public API cannot change DS records. They read a logged-in session from `~/.namecheap-mcp/ap-cookies.txt`, copied from the browser dev tools. The session expires after about 2 hours.
 
 ## Prerequisites
 
@@ -64,7 +69,7 @@ claude mcp add --scope user --transport stdio namecheap -- \
   java -jar /path/to/namecheap-mcp-1.0.0.jar
 ```
 
-Restart Claude Code after registration. The 8 Namecheap tools will be available immediately.
+Restart Claude Code after registration. The 11 Namecheap tools will be available immediately.
 
 ### Command-line options
 
@@ -179,7 +184,7 @@ src/main/java/com/namecheap/mcp/
   NamecheapMcpServer.java    # Entry point, server setup
   TransportConfig.java       # --transport/--bind/--port/--auth-token-file parsing
   HttpTransportServer.java   # Embedded Jetty, streamable HTTP at /mcp, bearer auth
-  NamecheapTools.java        # MCP tool definitions (8 tools)
+  NamecheapTools.java        # MCP tool definitions (11 tools)
   NamecheapClient.java       # HTTP client, XML parsing, API calls
   NamecheapAuth.java         # Config loading, --init flow, Claude registration
   ContentSanitizer.java      # Prompt injection mitigations
